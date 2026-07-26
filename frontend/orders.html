@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>OrderPulse - Orders</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar">
+    <h1>OrderPulse <span>Orders</span></h1>
+    <ul class="nav-links">
+        <li><a href="index.html">Dashboard</a></li>
+        <li><a href="users.html">Users</a> </li>
+        <li><a href="products.html">Products</a> </li>
+        <li><a href="orders.html" class="active">Orders</a></li>
+        <li><a href="payments.html">Payments</a> </li>
+        <li><a href="ai-assistant.html">AI Assistant</a> </li>
+        <li class="nav-user-section" id="navUserSection"></li>
+    </ul>
+</nav>
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h2>Orders by User</h2>
+            <div style="display: flex;gap: 0.5rem; flex-wrap: wrap;">
+                <input type="number" id="userIdInput" placeholder="Enter User ID" min="1" style="padding: 0.5rem;border: 1px solid #ccc;border-radius: 4px;">
+                <button class="btn btn-primary" onclick="loadOrders()">Fetch Orders</button>
+                <button class="btn btn-success" onclick="openCreateModal()">+ New Order</button>
+                <span id="myUserInfo" style="color:#666;font-size:0.85rem;align-self:center;"></span>
+            </div>
+        </div>
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Order ID</th>
+                <th>User ID</th>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Total Price</th>
+                <th>Status</th>
+            </tr>
+            </thead>
+            <tbody id="ordersTableBody">
+                <tr><td colspan="8" style="text-align: center;">Enter a User ID and click Fetch Orders</td> </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+<div id="createModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeCreateModal()">x</span>
+        <h2>Create New Order</h2>
+        <form id="createOrderForm">
+            <div class="form-group">
+                <label>User ID</label>
+                <input type="number" id="orderUserId" min="1" required>
+            </div>
+            <div class="form-group">
+                <label>Product</label>
+                <select id="orderProductId" required style="width:100%;padding:0.6rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+                    <option value="">-- Select Product --</option>
+                </select>
+                <div id="selectedProductInfo" style="margin-top:0.3rem;font-size:0.85rem;color:#666;"></div>
+            </div>
+            <div class="form-group">
+                <label>Quantity</label>
+                <input type="number" id="orderQuantity" min="1" required>
+            </div>
+            <button type="submit" class="btn btn-success">Place Order</button>
+        </form>
+    </div>
+</div>
+<script src="./js/api.js"></script>
+<script src="js/orders.js"></script>
+<script>
+(function() {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const section = document.getElementById('navUserSection');
+    if (section && user.name) {
+        section.innerHTML = '<span style="color:rgba(255,255,255,0.8);font-size:0.85rem;">' + user.name + ' (' + user.role + ')</span>' +
+            '<button class="btn-logout" onclick="localStorage.removeItem(\'token\');localStorage.removeItem(\'user\');window.location.href=\'/index.html\'" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:0.3rem 0.8rem;border-radius:4px;cursor:pointer;font-size:0.8rem;">Logout</button>';
+    }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>OrderPulse - AI Assistant</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar">
+    <h1>OrderPulse <span>AI Assistant</span></h1>
+    <ul class="nav-links">
+        <li><a href="index.html">Dashboard</a> </li>
+        <li><a href="users.html">Users</a> </li>
+        <li><a href="products.html">Products</a> </li>
+        <li><a href="orders.html">Orders</a> </li>
+        <li><a href="payments.html">Payments</a> </li>
+        <li><a href="ai-assistant.html" class="active">AI Assistant</a> </li>
+        <li class="nav-user-section" id="navUserSection"></li>
+    </ul>
+</nav>
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h2>Smart Order Assistant</h2>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="number" id="aiUserId" placeholder="Enter User ID" min="1" style="padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; width: 200px;">
+                <button class="btn btn-primary" onclick="getInsights()">Get Insights</button>
+            </div>
+        </div>
+        <div id="insightsResult" style="margin-top: 1rem;">
+            <p style="text-align: center; color: #666;">Enter a User ID and click get Insights</p>
+        </div>
+    </div>
+</div>
+<script src="js/api.js"></script>
+<script src="js/ai-assistant.js"></script>
+<script>
+(function() {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const section = document.getElementById('navUserSection');
+    if (section && user.name) {
+        section.innerHTML = '<span style="color:rgba(255,255,255,0.8);font-size:0.85rem;">' + user.name + ' (' + user.role + ')</span>' +
+            '<button class="btn-logout" onclick="localStorage.removeItem(\'token\');localStorage.removeItem(\'user\');window.location.href=\'/index.html\'" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:0.3rem 0.8rem;border-radius:4px;cursor:pointer;font-size:0.8rem;">Logout</button>';
+    }
+})();
+</script>
+</body>
+</html>
