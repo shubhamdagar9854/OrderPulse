@@ -1,0 +1,13 @@
+*.class
+*.jar
+*.jar.original
+target/
+*/target/
+logs/
+*.log
+.idea/
+*.iml
+.vscode/
+node_modules/
+.DS_Store
+Thumbs.db
