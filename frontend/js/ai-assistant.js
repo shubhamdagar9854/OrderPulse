@@ -1,6 +1,3 @@
-const GEMINI_API_KEY = 'YOUR_GEMINI_API_KEY';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-
 if (!localStorage.getItem('token')) {
     window.location.href = '/index.html';
 }
@@ -34,16 +31,14 @@ Provide:
 3. Spending patterns
 4. Recommendations`;
 
-        const res = await fetch(GEMINI_URL, {
+        const res = await fetch('/api/ai-insights', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
-            })
+            body: JSON.stringify({ prompt })
         });
 
         const data = await res.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'No insights generated.';
+        const text = data?.text || 'No insights generated.';
 
         resultDiv.innerHTML = `
             <div style="background:#f7f8fc;border-radius:8px;padding:1.5rem;">
