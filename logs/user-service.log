@@ -105,3 +105,16 @@ Hibernate: select u1_0.id,u1_0.created_at,u1_0.email,u1_0.name,u1_0.password,u1_
 Hibernate: select count(*) from users u1_0
 Hibernate: insert into users (created_at,email,name,password,role,id) values (?,?,?,?,?,default)
 Hibernate: select u1_0.id,u1_0.created_at,u1_0.email,u1_0.name,u1_0.password,u1_0.role from users u1_0 where u1_0.email=?
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  41:59 min
+[INFO] Finished at: 2026-07-27T01:32:36+05:30
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.springframework.boot:spring-boot-maven-plugin:3.3.3:run (default-cli) on project user-service: Process terminated with exit code: -1 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException

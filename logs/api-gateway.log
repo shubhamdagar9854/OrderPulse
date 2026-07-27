@@ -75,3 +75,16 @@ WARNING: sun.misc.Unsafe::allocateMemory will be removed in a future release
 2026-07-27T00:51:20.728+05:30  WARN 11672 --- [api-gateway] [           main] iguration$LoadBalancerCaffeineWarnLogger : Spring Cloud LoadBalancer is currently working with the default cache. While this cache implementation is useful for development and tests, it's recommended to use Caffeine cache in production.You can switch to using Caffeine cache, by adding it and org.springframework.cache.caffeine.CaffeineCacheManager to the classpath.
 2026-07-27T00:51:21.212+05:30  INFO 11672 --- [api-gateway] [           main] o.s.b.web.embedded.netty.NettyWebServer  : Netty started on port 8080 (http)
 2026-07-27T00:51:21.434+05:30  INFO 11672 --- [api-gateway] [           main] c.s.apigateway.ApiGatewayApplication     : Started ApiGatewayApplication in 8.003 seconds (process running for 9.329)
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  41:40 min
+[INFO] Finished at: 2026-07-27T01:32:36+05:30
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.springframework.boot:spring-boot-maven-plugin:3.3.3:run (default-cli) on project api-gateway: Process terminated with exit code: -1 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
