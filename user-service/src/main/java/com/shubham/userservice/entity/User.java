@@ -22,6 +22,7 @@ public class User {
 
     private String role = "USER";
 
+    @Column(columnDefinition = "datetime")
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public User() {}
@@ -56,8 +57,7 @@ public class User {
         private String email;
         private String password;
         private String role = "USER";
-    @Column(columnDefinition = "datetime")
-    private LocalDateTime createdAt = LocalDateTime.now();
+        private LocalDateTime createdAt = LocalDateTime.now();
 
         UserBuilder() {}
 
