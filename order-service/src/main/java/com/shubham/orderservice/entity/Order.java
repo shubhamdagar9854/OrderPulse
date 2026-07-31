@@ -19,6 +19,7 @@ public class Order {
 
     private String status = "PENDING";
 
+    @Column(columnDefinition = "datetime")
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public Order() {}

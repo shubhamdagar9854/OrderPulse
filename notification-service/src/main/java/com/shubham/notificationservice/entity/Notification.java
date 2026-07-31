@@ -15,6 +15,7 @@ public class Notification {
     private String email;
     private String message;
 
+    @Column(columnDefinition = "datetime")
     private LocalDateTime sentAt = LocalDateTime.now();
 
     public Notification() {}

@@ -15,6 +15,7 @@ public class Payment {
     private Long orderId;
     private BigDecimal amount;
     private String status = "PAID";
+    @Column(columnDefinition = "datetime")
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public Payment() {}
