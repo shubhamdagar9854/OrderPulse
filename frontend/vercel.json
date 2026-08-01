@@ -1,8 +1,24 @@
 {
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "https://your-backend-url.com/api/$1"
+      "source": "/api/users(.*)",
+      "destination": "https://api-gateway-imq7.onrender.com/api/users$1"
+    },
+    {
+      "source": "/api/products(.*)",
+      "destination": "https://api-gateway-imq7.onrender.com/api/products$1"
+    },
+    {
+      "source": "/api/orders(.*)",
+      "destination": "https://api-gateway-imq7.onrender.com/api/orders$1"
+    },
+    {
+      "source": "/api/payments(.*)",
+      "destination": "https://api-gateway-imq7.onrender.com/api/payments$1"
+    },
+    {
+      "source": "/api/notifications(.*)",
+      "destination": "https://api-gateway-imq7.onrender.com/api/notifications$1"
     }
   ],
   "headers": [
