@@ -64,7 +64,7 @@ flowchart TB
         PE["Topic: payment-events"]
     end
 
-    UI -->|"POST /api/orders<br/>PUT /api/orders/{id}/pay"| GW
+    UI -->|"POST /api/orders<br/>PUT /api/orders/:id/pay"| GW
     UI -->|"fetch orders"| AI_FN
     GW --> US
     GW --> PS
@@ -190,7 +190,7 @@ Cancellation works for both `UNPAID` and `PAID` orders. If the order is `PAID`, 
 
 ```mermaid
 flowchart TD
-    A[PUT /api/orders/{id}/cancel] --> B{Order status?}
+    A[PUT /api/orders/:id/cancel] --> B{Order status?}
     B -->|UNPAID| C[Restore stock]
     B -->|PAID| D[Call payment-service refund<br/>Feign POST /api/payments/refund]
     D --> E[Restore stock]
@@ -205,8 +205,8 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    OS["Order Service"] -->|order-events<br/>{orderId, userId, productId, quantity, totalPrice, status, email}| KAFKA[(Kafka)]
-    PMS["Payment Service"] -->|payment-events<br/>{paymentId, orderId, status}| KAFKA
+    OS["Order Service"] -->|"order-events<br/>(orderId, userId, productId, quantity, totalPrice, status, email)"| KAFKA[(Kafka)]
+    PMS["Payment Service"] -->|"payment-events<br/>(paymentId, orderId, status)"| KAFKA
     KAFKA --> NS["Notification Service"]
     NS -->|save| DB[(notifications table)]
 ```
