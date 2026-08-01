@@ -29,9 +29,19 @@ public class OrderController {
         return ResponseEntity.ok(orderService.findAll());
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id) {
+        return ResponseEntity.ok(orderService.getOrderById(id));
+    }
+
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<OrderResponse>> getOrdersByUser(@PathVariable Long userId) {
         return ResponseEntity.ok(orderService.getOrdersByUserId(userId));
+    }
+
+    @PutMapping("/{id}/pay")
+    public ResponseEntity<OrderResponse> payOrder(@PathVariable Long id) {
+        return ResponseEntity.ok(orderService.markOrderPaid(id));
     }
 
     @PutMapping("/{id}/cancel")

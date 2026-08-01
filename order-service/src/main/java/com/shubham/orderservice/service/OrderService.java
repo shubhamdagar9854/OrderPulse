@@ -56,20 +56,6 @@ public class OrderService {
                 .build();
         order = orderRepository.save(order);
 
-        String paymentStatus = "PAID";
-        try {
-            paymentClient.processPayment(Map.of("orderId", order.getId(), "amount", totalPrice));
-            log.info("Payment processed for order: {}", order.getId());
-        } catch (Exception e) {
-            log.warn("Payment failed for order {}: {}", order.getId(), e.getMessage());
-            paymentStatus = "PAYMENT_FAILED";
-            productClient.restoreStock(request.getProductId(), Map.of("quantity", request.getQuantity()));
-            log.info("Saga compensation: stock restored for product {} due to payment failure", request.getProductId());
-        }
-
-        order.setStatus(paymentStatus);
-        order = orderRepository.save(order);
-
         try {
             kafkaTemplate.send("order-events", Map.of(
                     "orderId", order.getId(),
@@ -84,7 +70,7 @@ public class OrderService {
             log.warn("Kafka not available, order event skipped: {}", e.getMessage());
         }
 
-        log.info("Order created: {} | status: {}", order.getId(), paymentStatus);
+        log.info("Order created: {} | status: {}", order.getId(), order.getStatus());
         return toResponse(order);
     }
 
@@ -99,10 +85,43 @@ public class OrderService {
                 .toList();
     }
 
+    public OrderResponse getOrderById(Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
+        return toResponse(order);
+    }
+
     public List<OrderResponse> getOrdersByUserId(Long userId) {
         return orderRepository.findByUserId(userId).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional
+    public OrderResponse markOrderPaid(Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
+        if ("PAID".equals(order.getStatus())) {
+            return toResponse(order);
+        }
+        if ("CANCELLED".equals(order.getStatus())) {
+            throw new IllegalArgumentException("Cancelled order cannot be paid");
+        }
+
+        order.setStatus("PAID");
+        order = orderRepository.save(order);
+
+        try {
+            kafkaTemplate.send("order-events", Map.of(
+                    "orderId", order.getId(),
+                    "status", "PAID"
+            ));
+        } catch (Exception e) {
+            log.warn("Kafka not available, paid event skipped: {}", e.getMessage());
+        }
+
+        log.info("Order marked PAID: {}", id);
+        return toResponse(order);
     }
 
     @CircuitBreaker(name = "productService", fallbackMethod = "cancelOrderFallback")
@@ -112,6 +131,11 @@ public class OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
         if ("CANCELLED".equals(order.getStatus())) {
             throw new IllegalArgumentException("Order already cancelled");
+        }
+
+        if ("PAID".equals(order.getStatus())) {
+            paymentClient.refund(Map.of("orderId", order.getId()));
+            log.info("Refund processed for order: {}", order.getId());
         }
 
         productClient.restoreStock(order.getProductId(), Map.of("quantity", order.getQuantity()));

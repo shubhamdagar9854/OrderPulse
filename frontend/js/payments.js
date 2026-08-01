@@ -12,7 +12,7 @@ document.getElementById('paymentForm').addEventListener('submit', async (e) => {
         const res = await paymentAPI.process(data);
         document.getElementById('paymentResult').innerHTML =
             `<div style="padding:0.75rem;background:#c6f6d5;color:#276749;border-radius:6px;">
-                Payment successful! ID: ${res.id} | Status: ${res.status}
+                Payment successful! Order #${res.orderId} marked PAID | Payment ID: ${res.id}
             </div>`;
         document.getElementById('paymentForm').reset();
     } catch (err) {

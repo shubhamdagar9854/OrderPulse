@@ -56,11 +56,11 @@ async function loadOrders() {
                 <td>₹${parseFloat(o.totalPrice).toFixed(2)}</td>
                 <td>
                     <span style="padding:0.25rem 0.5rem;border-radius:4px;font-size:0.8rem;background:${
-            o.status === 'CANCELLED' ? '#fed7d7' : o.status === 'PENDING' ? '#fefcbf' : '#c6f6d5'
+            o.status === 'CANCELLED' ? '#fed7d7' : o.status === 'UNPAID' ? '#fefcbf' : '#c6f6d5'
         };color:${
-            o.status === 'CANCELLED' ? '#9b2c2c' : o.status === 'PENDING' ? '#975a16' : '#276749'
+            o.status === 'CANCELLED' ? '#9b2c2c' : o.status === 'UNPAID' ? '#975a16' : '#276749'
         }">${o.status}</span>
-                    ${o.status === 'PENDING' ? `<button class="btn btn-sm btn-danger" onclick="cancelOrder(${o.id})" style="margin-left:0.5rem;">Cancel</button>` : ''}
+                    ${(o.status === 'UNPAID' || o.status === 'PAID') ? `<button class="btn btn-sm btn-danger" onclick="cancelOrder(${o.id})" style="margin-left:0.5rem;">Cancel</button>` : ''}
                 </td>
             </tr>
         `).join('');

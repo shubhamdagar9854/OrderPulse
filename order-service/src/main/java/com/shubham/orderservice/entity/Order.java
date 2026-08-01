@@ -17,7 +17,7 @@ public class Order {
     private Integer quantity;
     private BigDecimal totalPrice;
 
-    private String status = "PENDING";
+    private String status = "UNPAID";
 
     @Column(columnDefinition = "datetime")
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -47,7 +47,7 @@ public class Order {
 
     public static class OrderBuilder {
         private Long id; private Long userId; private Long productId; private Integer quantity;
-        private BigDecimal totalPrice; private String status = "PENDING"; private LocalDateTime createdAt = LocalDateTime.now();
+        private BigDecimal totalPrice; private String status = "UNPAID"; private LocalDateTime createdAt = LocalDateTime.now();
         OrderBuilder() {}
         public OrderBuilder id(Long id) { this.id = id; return this; }
         public OrderBuilder userId(Long userId) { this.userId = userId; return this; }
