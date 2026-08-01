@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport"
-          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+          content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>OrderPulse - Login</title>
     <link rel="stylesheet" href="css/style.css">
@@ -85,6 +85,7 @@
 <body>
     <nav class="navbar">
         <h1> OrderPulse <span id="navTitle">Login</span></h1>
+        <button class="nav-toggle" onclick="toggleNav()">&#9776;</button>
         <ul class="nav-links dashboard-only">
             <li><a href="index.html" class="active">Dashboard</a></li>
             <li><a href="users.html">Users</a></li>
@@ -175,6 +176,10 @@
 <script>
 function getToken() { return localStorage.getItem('token'); }
 function getUser() { return JSON.parse(localStorage.getItem('user') || '{}'); }
+
+function toggleNav() {
+    document.querySelector('.nav-links').classList.toggle('open');
+}
 
 function switchAuthTab(tab) {
     document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));

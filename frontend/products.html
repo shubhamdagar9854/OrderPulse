@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport"
-          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+          content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>OrderPulse - Products</title>
     <link rel="stylesheet" href="css/style.css">
@@ -11,6 +11,7 @@
 <body>
 <nav class="navbar">
     <h1>OrderPulse <span>Products</span></h1>
+    <button class="nav-toggle" onclick="toggleNav()">&#9776;</button>
     <ul class="nav-links">
         <li><a href="index.html">Dashboard</a> </li>
         <li><a href="users.html">Users</a> </li>
@@ -30,6 +31,7 @@
                 <button id="addProductBtn" class="btn btn-primary" onclick="openAddModal()">+Add Products</button>
             </div>
         </div>
+        <div class="table-responsive">
         <table class="table">
             <thead>
             <tr>
@@ -45,6 +47,7 @@
                 <tr><td colspan="6" style="text-align: center">Loading....</td> </tr>
             </tbody>
         </table>
+        </div>
     </div>
 </div>
 <div id="addModal" class="modal">
@@ -101,6 +104,9 @@
 <script src="js/api.js"></script>
 <script src="js/products.js"></script>
 <script>
+function toggleNav() {
+    document.querySelector('.nav-links').classList.toggle('open');
+}
 (function() {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const section = document.getElementById('navUserSection');
