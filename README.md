@@ -2,7 +2,6 @@
 
 OrderPulse is an **e-commerce order management system** built on a **microservices architecture**. This guide covers the full project structure, what each service does, every flow (order, payment, cancel, auth, AI), endpoints, database, and deployment.
 
-> Default login: `admin@orderpulse.com` / `admin123`
 
 ---
 
