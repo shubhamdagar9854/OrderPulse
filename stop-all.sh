@@ -3,7 +3,7 @@ echo ""
 echo " Stopping all OrderPulse services..."
 echo ""
 
-PORTS=(8761 8080 8081 8082 8083 8084 8085)
+PORTS=(8080 8081 8082 8083 8084 8085)
 for port in "${PORTS[@]}"; do
     pid=$(lsof -ti:$port 2>/dev/null)
     if [ -n "$pid" ]; then
