@@ -36,6 +36,7 @@ const userAPI = {
     register: (data) => apiRequest('/api/users/register', { method: 'POST', body: data }),
     login: (data) => apiRequest('/api/users/login', { method: 'POST', body: data }),
     updateRole: (id, data) => apiRequest(`/api/users/${id}/role`, { method: 'PUT', body: data }),
+    changePassword: (id, data) => apiRequest(`/api/users/${id}/password`, { method: 'PUT', body: data }),
 };
 
 const productAPI = {
@@ -50,8 +51,16 @@ const orderAPI = {
     getAll: () => apiRequest('/api/orders'),
     create: (data) => apiRequest('/api/orders', { method: 'POST', body: data }),
     getByUser: (userId) => apiRequest(`/api/orders/user/${userId}`),
+    getById: (id) => apiRequest(`/api/orders/${id}`),
     cancel: (id) => apiRequest(`/api/orders/${id}/cancel`, { method: 'PUT' }),
     updateStatus: (id, status) => apiRequest(`/api/orders/${id}/status`, { method: 'PUT', body: { status } }),
+    analytics: () => apiRequest('/api/orders/analytics/summary'),
+    getCart: (userId) => apiRequest(`/api/orders/cart/${userId}`),
+    addToCart: (userId, data) => apiRequest(`/api/orders/cart/${userId}/items`, { method: 'POST', body: data }),
+    updateCartItem: (userId, productId, data) => apiRequest(`/api/orders/cart/${userId}/items/${productId}`, { method: 'PUT', body: data }),
+    removeCartItem: (userId, productId) => apiRequest(`/api/orders/cart/${userId}/items/${productId}`, { method: 'DELETE' }),
+    clearCart: (userId) => apiRequest(`/api/orders/cart/${userId}`, { method: 'DELETE' }),
+    checkout: (userId) => apiRequest(`/api/orders/cart/${userId}/checkout`, { method: 'POST' }),
 };
 
 const paymentAPI = {

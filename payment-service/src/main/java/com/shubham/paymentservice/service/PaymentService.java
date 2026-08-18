@@ -177,10 +177,17 @@ public class PaymentService {
                 .toList();
     }
 
+    public List<PaymentResponse> getPaymentsByUserId(Long userId) {
+        return paymentRepository.findByUserId(userId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     private PaymentResponse toResponse(Payment payment) {
         return PaymentResponse.builder()
                 .id(payment.getId())
                 .orderId(payment.getOrderId())
+                .userId(payment.getUserId())
                 .amount(payment.getAmount())
                 .currency(payment.getCurrency())
                 .status(payment.getStatus())

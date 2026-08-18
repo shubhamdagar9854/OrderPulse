@@ -18,6 +18,12 @@ public class GlobalExceptionHandler {
                 .body(Map.of("message", ex.getMessage(), "timestamp", LocalDateTime.now()));
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Map<String, Object>> handleForbidden(ForbiddenException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", ex.getMessage(), "timestamp", LocalDateTime.now()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)

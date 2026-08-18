@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>OrderPulse - Cart</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar">
+    <h1>OrderPulse <span>Cart</span></h1>
+    <button class="nav-toggle" onclick="toggleNav()">&#9776;</button>
+    <ul class="nav-links">
+        <li><a href="index.html">Dashboard</a></li>
+        <li><a href="users.html">Users</a></li>
+        <li><a href="products.html">Products</a></li>
+        <li><a href="orders.html">Orders</a></li>
+        <li><a href="cart.html" class="active">Cart</a></li>
+        <li><a href="payments.html">Payments</a></li>
+        <li><a href="ai-assistant.html">AI Assistant</a></li>
+        <li class="nav-user-section" id="navUserSection"></li>
+    </ul>
+</nav>
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h2>My Cart</h2>
+            <div style="display: flex;gap: 0.5rem; flex-wrap: wrap;">
+                <span id="myUserInfo" style="color:#666;font-size:0.85rem;align-self:center;"></span>
+            </div>
+        </div>
+        <div class="table-responsive">
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Product</th>
+                <th>Price</th>
+                <th>Quantity</th>
+                <th>Line Total</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody id="cartTableBody">
+                <tr><td colspan="5" style="text-align: center;">Loading cart...</td></tr>
+            </tbody>
+        </table>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1rem;flex-wrap:wrap;gap:0.5rem;">
+            <strong id="cartTotal" style="font-size:1.1rem;">Total: ₹0.00</strong>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                <button class="btn btn-warning" onclick="clearCart()">Clear Cart</button>
+                <button class="btn btn-success" onclick="checkout()">Checkout</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Add to Cart</h2>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:1rem;">
+            <select id="cartProductSelect" style="flex:1;min-width:200px;padding:0.6rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+                <option value="">-- Select Product --</option>
+            </select>
+            <input type="number" id="cartQuantity" value="1" min="1" style="width:80px;padding:0.6rem;border:1px solid #d1d5db;border-radius:6px;">
+            <button class="btn btn-primary" onclick="addToCart()">Add</button>
+        </div>
+        <div id="cartProductInfo" style="margin-top:0.3rem;font-size:0.85rem;color:#666;"></div>
+    </div>
+</div>
+<script src="./js/api.js"></script>
+<script src="js/cart.js"></script>
+<script>
+function toggleNav() {
+    document.querySelector('.nav-links').classList.toggle('open');
+}
+(function() {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const section = document.getElementById('navUserSection');
+    if (section && user.name) {
+        section.innerHTML = '<span style="color:rgba(255,255,255,0.8);font-size:0.85rem;">' + user.name + ' (' + user.role + ')</span>' +
+            '<button class="btn-logout" onclick="localStorage.removeItem(\'token\');localStorage.removeItem(\'user\');window.location.href=\'/index.html\'" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:0.3rem 0.8rem;border-radius:4px;cursor:pointer;font-size:0.8rem;">Logout</button>';
+    }
+})();
+</script>
+</body>
+</html>

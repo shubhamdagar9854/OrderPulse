@@ -1,8 +1,16 @@
 package com.shubham.paymentservice.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class VerifyPaymentRequest {
+
+    @NotBlank(message = "Razorpay order id is required")
     private String razorpayOrderId;
+
+    @NotBlank(message = "Payment id is required")
     private String paymentId;
+
+    @NotBlank(message = "Signature is required")
     private String signature;
 
     public VerifyPaymentRequest() {}

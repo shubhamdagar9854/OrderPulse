@@ -91,6 +91,7 @@
             <li><a href="users.html">Users</a></li>
             <li><a href="products.html">Products</a></li>
             <li><a href="orders.html">Orders</a></li>
+            <li><a href="cart.html">Cart</a></li>
             <li><a href="payments.html">Payment</a></li>
             <li><a href="ai-assistant.html">AI</a></li>
             <li class="nav-user-section" id="navUserSection"></li>
@@ -166,8 +167,17 @@
                 <a href="users.html" class="btn btn-primary">Manage Users</a>
                 <a href="products.html" class="btn btn-success">Manage Products</a>
                 <a href="orders.html" class="btn btn-warning">View Orders</a>
+                <a href="cart.html" class="btn btn-primary">My Cart</a>
                 <a href="payments.html" class="btn btn-danger">Process Payment</a>
                 <a href="ai-assistant.html" class="btn btn-primary">AI Assistant</a>
+            </div>
+        </div>
+        <div class="card" id="analyticsCard" style="display:none;">
+            <h2>Sales Analytics</h2>
+            <div class="stats-grid" id="analyticsGrid" style="margin-top:1rem;"></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1rem;flex-wrap:wrap;gap:0.5rem;">
+                <strong id="analyticsRevenue" style="font-size:1.1rem;"></strong>
+                <button class="btn btn-sm btn-primary" onclick="loadAnalytics()">Refresh</button>
             </div>
         </div>
     </div>
@@ -278,6 +288,48 @@ async function loadStats() {
         document.getElementById('paymentcount').textContent = Array.isArray(payments) ? payments.length : 'N/A';
     } catch (err) {
         console.error('Stats error:', err);
+    }
+    const user = getUser();
+    if (user.role === 'ADMIN') {
+        document.getElementById('analyticsCard').style.display = 'block';
+        loadAnalytics();
+    }
+}
+
+async function loadAnalytics() {
+    const grid = document.getElementById('analyticsGrid');
+    try {
+        const a = await orderAPI.analytics();
+        const statusCounts = a.orderStatusCounts || {};
+        const countsHtml = Object.keys(statusCounts).map(s =>
+            `<div class="stat-card"><h3>${statusCounts[s]}</h3><p>${s}</p></div>`
+        ).join('');
+        const topHtml = (a.topProducts || []).map(p =>
+            `<div class="stat-card"><h3>${p.totalQuantity}</h3><p>${p.productName}</p></div>`
+        ).join('');
+        grid.innerHTML = `
+            <div class="stat-card"><h3>${a.totalOrders}</h3><p>Total Orders</p></div>
+            <div class="stat-card"><h3>₹${parseFloat(a.totalRevenue).toFixed(2)}</h3><p>Total Revenue</p></div>
+            <div class="stat-card"><h3>${a.ordersToday}</h3><p>Orders Today</p></div>
+            <div class="stat-card"><h3>₹${parseFloat(a.averageOrderValue).toFixed(2)}</h3><p>Avg Order Value</p></div>
+            ${countsHtml}
+            <div class="stat-card" style="grid-column:1/-1;font-size:0.9rem;text-align:left;">
+                <strong>Top Products</strong>
+                <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem;">
+                    ${topHtml || '<span>No sales yet</span>'}
+                </div>
+            </div>
+        `;
+        document.getElementById('analyticsRevenue').textContent =
+            'Recent orders: ' + (a.recentOrders || []).length + ' shown below';
+        const recent = a.recentOrders || [];
+        if (recent.length > 0) {
+            grid.innerHTML += recent.map(o =>
+                `<div class="stat-card" style="font-size:0.85rem;"><p>#${o.id} ${o.userId} ${o.status} ₹${parseFloat(o.totalPrice).toFixed(2)}</p></div>`
+            ).join('');
+        }
+    } catch (err) {
+        grid.innerHTML = `<div style="color:#e53e3e;padding:1rem;">Analytics failed: ${err.message}</div>`;
     }
 }
 

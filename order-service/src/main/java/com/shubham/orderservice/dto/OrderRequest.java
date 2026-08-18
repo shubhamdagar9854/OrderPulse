@@ -1,9 +1,21 @@
 package com.shubham.orderservice.dto;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 
 public class OrderRequest {
+
+    @NotNull(message = "User id is required")
+    @Positive(message = "User id must be positive")
     private Long userId;
+
+    @NotNull(message = "Product id is required")
+    @Positive(message = "Product id must be positive")
     private Long productId;
+
+    @NotNull(message = "Quantity is required")
+    @Positive(message = "Quantity must be at least 1")
     private Integer quantity;
 
     public OrderRequest() {}

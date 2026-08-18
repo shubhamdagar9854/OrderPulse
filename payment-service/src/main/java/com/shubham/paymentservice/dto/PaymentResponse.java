@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 public class PaymentResponse {
     private Long id;
     private Long orderId;
+    private Long userId;
     private BigDecimal amount;
     private String currency;
     private String status;
@@ -17,10 +18,10 @@ public class PaymentResponse {
     private LocalDateTime updatedAt;
 
     public PaymentResponse() {}
-    public PaymentResponse(Long id, Long orderId, BigDecimal amount, String currency, String status,
+    public PaymentResponse(Long id, Long orderId, Long userId, BigDecimal amount, String currency, String status,
                            String method, String razorpayOrderId, String paymentId, String keyId,
                            LocalDateTime createdAt, LocalDateTime updatedAt) {
-        this.id = id; this.orderId = orderId; this.amount = amount; this.currency = currency;
+        this.id = id; this.orderId = orderId; this.userId = userId; this.amount = amount; this.currency = currency;
         this.status = status; this.method = method; this.razorpayOrderId = razorpayOrderId;
         this.paymentId = paymentId; this.keyId = keyId; this.createdAt = createdAt; this.updatedAt = updatedAt;
     }
@@ -29,6 +30,8 @@ public class PaymentResponse {
     public void setId(Long id) { this.id = id; }
     public Long getOrderId() { return orderId; }
     public void setOrderId(Long orderId) { this.orderId = orderId; }
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }
     public String getCurrency() { return currency; }
@@ -51,12 +54,13 @@ public class PaymentResponse {
     public static PaymentResponseBuilder builder() { return new PaymentResponseBuilder(); }
 
     public static class PaymentResponseBuilder {
-        private Long id; private Long orderId; private BigDecimal amount; private String currency;
+        private Long id; private Long orderId; private Long userId; private BigDecimal amount; private String currency;
         private String status; private String method; private String razorpayOrderId; private String paymentId;
         private String keyId; private LocalDateTime createdAt; private LocalDateTime updatedAt;
         PaymentResponseBuilder() {}
         public PaymentResponseBuilder id(Long id) { this.id = id; return this; }
         public PaymentResponseBuilder orderId(Long orderId) { this.orderId = orderId; return this; }
+        public PaymentResponseBuilder userId(Long userId) { this.userId = userId; return this; }
         public PaymentResponseBuilder amount(BigDecimal amount) { this.amount = amount; return this; }
         public PaymentResponseBuilder currency(String currency) { this.currency = currency; return this; }
         public PaymentResponseBuilder status(String status) { this.status = status; return this; }
@@ -66,7 +70,7 @@ public class PaymentResponse {
         public PaymentResponseBuilder keyId(String keyId) { this.keyId = keyId; return this; }
         public PaymentResponseBuilder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
         public PaymentResponseBuilder updatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; return this; }
-        public PaymentResponse build() { return new PaymentResponse(id, orderId, amount, currency, status,
+        public PaymentResponse build() { return new PaymentResponse(id, orderId, userId, amount, currency, status,
                 method, razorpayOrderId, paymentId, keyId, createdAt, updatedAt); }
     }
 }

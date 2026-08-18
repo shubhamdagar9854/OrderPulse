@@ -10,11 +10,14 @@ OrderPulse is an **e-commerce order management system** built on a **microservic
 An order system where:
 
 - A **user** logs in (JWT based)
-- Can **view products**
+- Can **view products** and build a **cart** (multiple products × quantity)
 - Places an **order** → the order is created as `UNPAID` (stock is reserved)
 - Makes a **payment** (as a separate step) → order becomes `PAID`
-- **Cancels** an order → if `PAID`, an **auto-refund** happens + stock is restored
-- An **admin** manages users, products, orders, and payments
+- **Tracks** the order through a full lifecycle: `UNPAID → PAID → CONFIRMED → PROCESSING → SHIPPED → DELIVERED` with a timeline (admin advances status; users see the track view)
+- **Cancels** an order → if `PAID`/later, an **auto-refund** happens + stock is restored
+- An **admin** manages users, products, orders, payments, and sees a **sales analytics dashboard** (revenue, orders today, top products, status counts)
+- Users can **change their password**; admins can **reset** any user's password
+- Service calls are **ownership-checked** (a user can only read their own orders/payments)
 - The **AI Assistant** gives insights from a user's order history (powered by Gemini)
 
 Everything is split into small, **independent services** that talk to each other over **HTTP (Feign)** and **Kafka events**.
@@ -29,8 +32,9 @@ Everything is split into small, **independent services** that talk to each other
 | Database | H2 (dev) / MySQL (prod) — each service has its own DB |
 | Messaging | Apache Kafka (Confluent 7.6.1 via Docker) |
 | Communication | OpenFeign (sync), Kafka (async events) |
-| Resilience | Resilience4j (circuit breaker + rate limiter) |
+| Resilience | Resilience4j (circuit breaker) |
 | Caching | Caffeine (product-service) |
+| Quality | Jakarta Bean Validation, AOP logging aspect, JUnit 5 + Mockito tests |
 | Security | JWT (jjwt 0.12.6), Spring Security |
 | Frontend | Vanilla HTML/CSS/JS (no framework) |
 | AI | Google Gemini 2.0 Flash (Vercel serverless function) |
@@ -259,11 +263,20 @@ stateDiagram-v2
     [*] --> UNPAID: Order placed (stock reserved)
     UNPAID --> PAID: Payment success
     UNPAID --> CANCELLED: User cancels (no refund)
+    PAID --> CONFIRMED: Admin advances
+    CONFIRMED --> PROCESSING: Admin advances
+    PROCESSING --> SHIPPED: Admin advances
+    SHIPPED --> DELIVERED: Admin advances
     PAID --> CANCELLED: User cancels (auto-refund)
+    CONFIRMED --> CANCELLED: User cancels (auto-refund)
+    PROCESSING --> CANCELLED: User cancels (auto-refund)
     CANCELLED --> [*]
 ```
 
-Status values: `UNPAID` → `PAID` → `CANCELLED`
+- Status values: `UNPAID` → `PAID` → `CONFIRMED` → `PROCESSING` → `SHIPPED` → `DELIVERED` (+ `CANCELLED`)
+- A status can **only move forward** one stage (or to `CANCELLED` if still cancellable) — invalid transitions return **400**
+- Each transition records a **timestamp** in the order; the response includes a `timeline[]` so the UI can render a tracking view
+- Admin advances status via `PUT /api/orders/{id}/status`; users can only **cancel**, never advance
 
 ---
 
@@ -278,14 +291,18 @@ Status values: `UNPAID` → `PAID` → `CANCELLED`
 | GET | `/api/users/{id}` | User profile | User |
 | PUT | `/api/users/{id}` | Update name/email/password | User |
 | PUT | `/api/users/{id}/role` | Change role | Admin |
+| PUT | `/api/users/{id}/password` | Change password (owner) / reset (admin) | User/Admin |
 
 ### product-service (8082)
 | Method | Path | Purpose | Auth |
 |---|---|---|---|
 | GET | `/api/products` | List products (cached) | User |
+| GET | `/api/products/search` | Search + filter + paginate | User |
+| GET | `/api/products/categories` | List categories | User |
 | GET | `/api/products/{id}` | Single product | User |
 | POST | `/api/products` | Create product | Admin |
 | PUT | `/api/products/{id}` | Update product | Admin |
+| DELETE | `/api/products/{id}` | Delete product | Admin |
 | PUT | `/api/products/{id}/reduce` | Decrease stock (order flow) | Internal |
 | PUT | `/api/products/{id}/restore` | Restore stock (cancel/compensation) | Internal |
 
@@ -294,10 +311,18 @@ Status values: `UNPAID` → `PAID` → `CANCELLED`
 |---|---|---|---|
 | POST | `/api/orders` | Create order → UNPAID | User |
 | GET | `/api/orders` | List all orders | Admin |
-| GET | `/api/orders/{id}` | Single order | User |
-| GET | `/api/orders/user/{userId}` | User's orders | User |
+| GET | `/api/orders/{id}` | Single order (ownership checked) | User |
+| GET | `/api/orders/user/{userId}` | User's orders (ownership checked) | User |
+| GET | `/api/orders/analytics/summary` | Sales analytics (revenue, top products, statuses) | Admin |
 | PUT | `/api/orders/{id}/pay` | Mark PAID (from payment-service) | Internal |
-| PUT | `/api/orders/{id}/cancel` | Cancel (+refund if PAID) | User |
+| PUT | `/api/orders/{id}/cancel` | Cancel (+refund if paid) | User |
+| PUT | `/api/orders/{id}/status` | Advance lifecycle status | Admin |
+| GET | `/api/orders/cart/{userId}` | Get cart (ownership checked) | User |
+| POST | `/api/orders/cart/{userId}/items` | Add item to cart | User |
+| PUT | `/api/orders/cart/{userId}/items/{productId}` | Update item quantity | User |
+| DELETE | `/api/orders/cart/{userId}/items/{productId}` | Remove item | User |
+| DELETE | `/api/orders/cart/{userId}` | Clear cart | User |
+| POST | `/api/orders/cart/{userId}/checkout` | Convert cart → orders | User |
 
 ### payment-service (8084)
 | Method | Path | Purpose | Auth |
@@ -306,6 +331,7 @@ Status values: `UNPAID` → `PAID` → `CANCELLED`
 | POST | `/api/payments/verify` | Verify HMAC signature → mark order PAID, payment SUCCESS | User |
 | POST | `/api/payments/refund` | Real Razorpay refund (cancel flow) | Internal |
 | GET | `/api/payments` | List all payments | Admin |
+| GET | `/api/payments/user/{userId}` | User's payments (ownership checked) | User |
 
 ### notification-service (8085)
 - **No REST endpoints** — it is only a Kafka consumer
@@ -323,7 +349,10 @@ Each service has its **own database** (H2 in dev / MySQL in prod).
 `id` | `name` | `description` | `price` (BigDecimal) | `quantity` (Integer)
 
 ### orders (order-service)
-`id` | `userId` | `productId` | `quantity` | `totalPrice` (BigDecimal) | `status` (UNPAID/PAID/CANCELLED) | `createdAt`
+`id` | `userId` | `productId` | `quantity` | `totalPrice` (BigDecimal) | `status` (UNPAID/PAID/CONFIRMED/PROCESSING/SHIPPED/DELIVERED/CANCELLED) | `createdAt` | `paidAt` | `confirmedAt` | `processedAt` | `shippedAt` | `deliveredAt` | `cancelledAt` | `updatedAt`
+
+### order_cart_items (order-service)
+`id` | `userId` | `productId` | `quantity` | `createdAt`
 
 ### payments (payment-service)
 `id` | `orderId` | `userId` | `razorpayOrderId` | `paymentId` | `signature` | `method` | `amount` (BigDecimal) | `currency` (INR) | `status` (PENDING/SUCCESS/FAILED/REFUNDED) | `createdAt` | `updatedAt`
@@ -339,10 +368,11 @@ Each service has its **own database** (H2 in dev / MySQL in prod).
 
 | Page | Purpose |
 |---|---|
-| `index.html` | Login/Register + Dashboard (stats for users, products, orders, payments) |
-| `users.html` | User list, Make Admin, Add User, Login-as |
+| `index.html` | Login/Register + Dashboard (stats + **admin sales analytics**) |
+| `users.html` | User list, Make Admin, Add User, Login-as, **Change Password / Admin Reset** |
 | `products.html` | Product list, Add/Edit (visible to ADMIN only) |
-| `orders.html` | User's orders, Create New Order, Cancel |
+| `orders.html` | User's orders, Create New Order, Cancel, **advance status (admin)**, **Track modal timeline** |
+| `cart.html` | **Multi-item cart** — add/update/remove/clear + checkout (creates orders) |
 | `payments.html` | Process Payment (order → PAID), Refund |
 | `ai-assistant.html` | Smart Order Assistant (Gemini insights) |
 
@@ -429,14 +459,63 @@ Root directory = `frontend/`. In `vercel.json`, `/api/*` requests are rewritten 
 1. **Eureka unused** — no service registers with it; everything uses direct URLs
 2. **No Kafka on Render** — `spring.kafka.bootstrap-servers=localhost:9092` is the default, so notifications don't get created in the deployed environment. A managed Kafka (Aiven/CloudKarafka) would fix this
 3. **Hardcoded email** — order-service sends `email: "user@example.com"` in events; the real user email is never fetched from user-service
-4. **No tests** — there is no test code in any service
-5. **Distributed transaction gap** — order-service has Feign calls inside `@Transactional`, so if any step fails, there can be a stock/order inconsistency (compensation currently only exists for payment-failure/cancel)
-6. **Dockerfile `EXPOSE 8080`** is hardcoded (actual ports 8081-8085 come from the `PORT` env var)
-7. **No cart** — one order has one product + quantity (no multi-item cart support)
+4. **Distributed transaction gap** — order-service has Feign calls inside `@Transactional`, so if any step fails, there can be a stock/order inconsistency (compensation currently only exists for payment-failure/cancel)
+5. **Dockerfile `EXPOSE 8080`** is hardcoded (actual ports 8081-8085 come from the `PORT` env var)
 
 ---
 
-## 18. Quick Request Example
+## 18. Testing
+
+Unit tests use **JUnit 5 + Mockito** (dependencies via `spring-boot-starter-test`):
+
+| Service | Test file | What it covers |
+|---|---|---|
+| order-service | `OrderServiceTest` | Lifecycle transitions (valid/invalid), cancel + refund/restore, ownership checks (owner / non-owner / admin bypass), analytics population |
+| payment-service | `PaymentServiceTest` | Signature verification (valid + tampered → FAILED), unknown razorpay order, refund with no successful payment |
+
+Run them:
+
+```bash
+cd order-service && mvn test
+cd payment-service && mvn test
+```
+
+---
+
+## 19. Cross-Cutting Quality
+
+- **Bean validation** (`jakarta.validation`) on request DTOs in all services — invalid input returns **400 with a readable message** (handled by a `MethodArgumentNotValidException` handler)
+- **AOP logging** — a `LoggingAspect` logs every `service.*` method (time taken + failures) in user/product/order/payment services
+- **Ownership security** — the API gateway injects `X-User-Id` / `X-User-Role` from the JWT; order & payment read endpoints verify the caller owns the resource (ADMIN bypasses). Non-owners get **403**
+- **Resilience4j circuit breaker** — order-service wraps product-service calls; when the breaker trips, real error messages (404/400) are preserved and timeouts surface as **503**
+
+---
+
+## 20. Resume / Interview Prep
+
+**One-liner:** "Built a 6-service microservices order management system with JWT auth, Razorpay payments, Kafka events, a cart + order-lifecycle tracking, and an AI assistant."
+
+**Architecture points to speak about:**
+1. **API Gateway** — single entry, JWT validation, role checks, injects `X-User-Id`/`X-User-Role` headers
+2. **Saga / orchestration** — order-service orchestrates stock (reduce/restore) and refund via Feign; compensation on cancel
+3. **Async decoupling** — Kafka `order-events`/`payment-events` → notification-service (non-blocking; flow works even if Kafka is down)
+4. **Resilience4j** — circuit breaker with `unwrapOrGeneric` fallback so 4xx errors aren't swallowed into 500s
+5. **Security** — BCrypt, JWT, admin vs user routes, service-level ownership checks (IDOR prevention)
+6. **Analytics** — JPQL aggregations (revenue, orders today, top products) exposed for the admin dashboard
+7. **Own DB per service** — data ownership pattern; no cross-service foreign keys
+
+**Common interview Q&A:**
+- *Why microservices?* Independent deploy/scaling; here: payment, auth, product stock evolve separately
+- *How do services communicate?* Sync via Feign (read/commands) + async via Kafka (events/notifications)
+- *What happens if product-service is down?* Circuit breaker returns 503 with a real message; frontend shows "try again"
+- *How is payment secured?* Amount computed server-side; HMAC signature verified with key_secret; refund uses the saved payment_id
+- *How do you stop users reading others' data?* Gateway injects identity headers; each service re-checks ownership → 403 (defense in depth)
+- *How does an order change status?* `OrderStatus` enum with a transition map — only one stage forward or cancel; each step timestamps a `timeline`
+- *What if Kafka fails?* `send()` wrapped in try/catch — order still completes, notification just skipped
+
+---
+
+## 21. Quick Request Example
 
 ```bash
 # Login

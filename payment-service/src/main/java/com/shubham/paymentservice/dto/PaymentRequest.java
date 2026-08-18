@@ -1,9 +1,16 @@
 package com.shubham.paymentservice.dto;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 import java.math.BigDecimal;
 
 public class PaymentRequest {
+
+    @NotNull(message = "Order id is required")
+    @Positive(message = "Order id must be positive")
     private Long orderId;
+
     private BigDecimal amount;
 
     public PaymentRequest() {}

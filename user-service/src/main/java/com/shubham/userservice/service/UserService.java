@@ -24,6 +24,9 @@ public class UserService {
     }
 
     public UserResponse register(UserRequest request) {
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new IllegalArgumentException("Password is required");
+        }
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new IllegalArgumentException("Email already registered");
         }
@@ -83,6 +86,16 @@ public class UserService {
         }
         user = userRepository.save(user);
         return toResponse(user);
+    }
+
+    public void changePassword(Long id, ChangePasswordRequest request, boolean skipCurrentCheck) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+        if (!skipCurrentCheck && !passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
     }
 
     public List<UserResponse> getAllUsers() {

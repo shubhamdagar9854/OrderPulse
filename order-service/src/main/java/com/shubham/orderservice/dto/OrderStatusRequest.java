@@ -1,6 +1,10 @@
 package com.shubham.orderservice.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class OrderStatusRequest {
+
+    @NotBlank(message = "Status is required")
     private String status;
 
     public OrderStatusRequest() {}

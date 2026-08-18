@@ -3,6 +3,7 @@ package com.shubham.productservice.controller;
 import com.shubham.productservice.dto.ProductRequest;
 import com.shubham.productservice.dto.ProductResponse;
 import com.shubham.productservice.service.ProductService;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -50,12 +51,12 @@ public class ProductController {
     }
 
     @PostMapping
-    public ResponseEntity<ProductResponse> createProduct(@RequestBody ProductRequest request) {
+    public ResponseEntity<ProductResponse> createProduct(@Valid @RequestBody ProductRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(productService.create(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ProductResponse> updateProduct(@PathVariable Long id, @RequestBody ProductRequest request) {
+    public ResponseEntity<ProductResponse> updateProduct(@PathVariable Long id, @Valid @RequestBody ProductRequest request) {
         return ResponseEntity.ok(productService.update(id, request));
     }
 

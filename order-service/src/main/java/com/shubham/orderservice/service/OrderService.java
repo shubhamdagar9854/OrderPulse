@@ -3,11 +3,13 @@ package com.shubham.orderservice.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shubham.orderservice.client.PaymentClient;
 import com.shubham.orderservice.client.ProductClient;
+import com.shubham.orderservice.dto.AnalyticsResponse;
 import com.shubham.orderservice.dto.OrderRequest;
 import com.shubham.orderservice.dto.OrderResponse;
 import com.shubham.orderservice.dto.OrderStatusRequest;
 import com.shubham.orderservice.entity.Order;
 import com.shubham.orderservice.enums.OrderStatus;
+import com.shubham.orderservice.exception.ForbiddenException;
 import com.shubham.orderservice.exception.ResourceNotFoundException;
 import com.shubham.orderservice.exception.ServiceUnavailableException;
 import com.shubham.orderservice.repository.OrderRepository;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -85,16 +88,30 @@ public class OrderService {
                 .toList();
     }
 
-    public OrderResponse getOrderById(Long id) {
+    public OrderResponse getOrderById(Long id, String xUserId, String xRole) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
+        assertOwner(order, xUserId, xRole);
         return toResponse(order);
     }
 
-    public List<OrderResponse> getOrdersByUserId(Long userId) {
+    public List<OrderResponse> getOrdersByUserId(Long userId, String xUserId, String xRole) {
+        assertOwnerAccess(userId, xUserId, xRole);
         return orderRepository.findByUserId(userId).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    private void assertOwner(Order order, String xUserId, String xRole) {
+        if ("ADMIN".equals(xRole)) return;
+        if (xUserId != null && !xUserId.isBlank() && String.valueOf(order.getUserId()).equals(xUserId)) return;
+        throw new ForbiddenException("You do not have permission to access this order");
+    }
+
+    private void assertOwnerAccess(Long targetUserId, String xUserId, String xRole) {
+        if ("ADMIN".equals(xRole)) return;
+        if (xUserId != null && !xUserId.isBlank() && String.valueOf(targetUserId).equals(xUserId)) return;
+        throw new ForbiddenException("You do not have permission to access this user's orders");
     }
 
     @Transactional
@@ -226,6 +243,70 @@ public class OrderService {
             return new ServiceUnavailableException(extractFeignMessage(feign, context + " temporarily unavailable. Please try again."));
         }
         return new ServiceUnavailableException(context + " temporarily unavailable. Please try again.");
+    }
+
+    public AnalyticsResponse getAnalytics() {
+        AnalyticsResponse response = new AnalyticsResponse();
+
+        response.setTotalOrders(orderRepository.count());
+
+        Object[] revenueRow = orderRepository.sumRevenueAndPaidCount();
+        if (revenueRow != null && revenueRow.length == 2 && revenueRow[0] != null) {
+            Object rawRevenue = revenueRow[0];
+            BigDecimal revenue = rawRevenue instanceof BigDecimal bd
+                    ? bd
+                    : new BigDecimal(rawRevenue.toString());
+            long paidCount = ((Number) revenueRow[1]).longValue();
+            response.setTotalRevenue(revenue);
+            if (paidCount > 0) {
+                response.setAverageOrderValue(revenue.divide(BigDecimal.valueOf(paidCount), 2, java.math.RoundingMode.HALF_UP));
+            }
+        } else if (revenueRow != null && revenueRow.length == 1 && revenueRow[0] instanceof Object[] nested) {
+            Object rawRevenue = nested[0];
+            if (rawRevenue != null) {
+                BigDecimal revenue = rawRevenue instanceof BigDecimal bd
+                        ? bd
+                        : new BigDecimal(rawRevenue.toString());
+                long paidCount = ((Number) nested[1]).longValue();
+                response.setTotalRevenue(revenue);
+                if (paidCount > 0) {
+                    response.setAverageOrderValue(revenue.divide(BigDecimal.valueOf(paidCount), 2, java.math.RoundingMode.HALF_UP));
+                }
+            }
+        }
+
+        response.setOrdersToday(orderRepository.countCreatedSince(LocalDate.now().atStartOfDay()));
+
+        Map<String, Long> statusCounts = new LinkedHashMap<>();
+        for (Object[] row : orderRepository.countByStatus()) {
+            OrderStatus status = (OrderStatus) row[0];
+            statusCounts.put(status.name(), ((Number) row[1]).longValue());
+        }
+        response.setOrderStatusCounts(statusCounts);
+
+        List<AnalyticsResponse.TopProduct> topProducts = new ArrayList<>();
+        for (Object[] row : orderRepository.sumQuantityByProduct()) {
+            AnalyticsResponse.TopProduct tp = new AnalyticsResponse.TopProduct();
+            tp.setProductId(((Number) row[0]).longValue());
+            tp.setTotalQuantity(((Number) row[1]).longValue());
+            tp.setProductName("Product #" + tp.getProductId());
+            try {
+                Map<String, Object> product = productClient.getProduct(tp.getProductId());
+                if (product.get("name") != null) {
+                    tp.setProductName(product.get("name").toString());
+                }
+            } catch (Exception ignored) {
+                // keep default name if product service unreachable
+            }
+            topProducts.add(tp);
+        }
+        response.setTopProducts(topProducts);
+
+        response.setRecentOrders(orderRepository.findTop5ByOrderByCreatedAtDesc().stream()
+                .map(this::toResponse)
+                .toList());
+
+        return response;
     }
 
     private String extractFeignMessage(FeignException e, String fallback) {
