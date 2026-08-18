@@ -45,7 +45,7 @@ public class OrderService {
     public OrderResponse createOrder(OrderRequest request) {
         Map<String, Object> product = productClient.reduceStock(request.getProductId(), Map.of("quantity", request.getQuantity()));
 
-        BigDecimal price = new BigDecimal(product.get("price").toString());
+        BigDecimal price = new BigDecimal(product.get("finalPrice").toString());
         BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(request.getQuantity()));
 
         Order order = Order.builder()

@@ -3,10 +3,12 @@ package com.shubham.productservice.controller;
 import com.shubham.productservice.dto.ProductRequest;
 import com.shubham.productservice.dto.ProductResponse;
 import com.shubham.productservice.service.ProductService;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +27,23 @@ public class ProductController {
         return ResponseEntity.ok(productService.findAll());
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<Page<ProductResponse>> search(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) String sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(productService.search(search, category, minPrice, maxPrice, sort, page, size));
+    }
+
+    @GetMapping("/categories")
+    public ResponseEntity<List<String>> getCategories() {
+        return ResponseEntity.ok(productService.getCategories());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ProductResponse> getProduct(@PathVariable Long id) {
         return ResponseEntity.ok(productService.findById(id));
@@ -37,7 +56,13 @@ public class ProductController {
 
     @PutMapping("/{id}")
     public ResponseEntity<ProductResponse> updateProduct(@PathVariable Long id, @RequestBody ProductRequest request) {
-        return ResponseEntity.ok(productService.updateStock(id, request));
+        return ResponseEntity.ok(productService.update(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
+        productService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}/reduce")
