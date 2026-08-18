@@ -55,6 +55,7 @@ const orderAPI = {
 
 const paymentAPI = {
     getAll: () => apiRequest('/api/payments'),
-    process: (data) => apiRequest('/api/payments', { method: 'POST', body: data }),
+    razorpayOrder: (data) => apiRequest('/api/payments/razorpay/order', { method: 'POST', body: data }),
+    verify: (data) => apiRequest('/api/payments/verify', { method: 'POST', body: data }),
     refund: (data) => apiRequest('/api/payments/refund', { method: 'POST', body: data }),
 };

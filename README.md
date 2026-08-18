@@ -154,44 +154,56 @@ sequenceDiagram
 
 ---
 
-## 7. Payment Flow (UNPAID → PAID)
+## 7. Payment Flow (UNPAID → PAID) — Razorpay Test Mode
 
-The user makes the payment from the **Payments page** — entering order ID + amount.
+Payment is processed through **Razorpay Test Mode**. Amount is always derived **server-side** from the order total (₹ → paise ×100), never trusted from the client.
 
 ```mermaid
 sequenceDiagram
     participant U as User (Frontend)
     participant GW as API Gateway
     participant PMS as Payment Service
+    participant RZP as Razorpay (Test Mode)
     participant OS as Order Service
 
-    U->>GW: POST /api/payments {orderId, amount}
-    GW->>PMS: Forward
+    U->>GW: POST /api/payments/razorpay/order {orderId}
+    GW->>PMS: Forward (X-User-Id injected by gateway)
     PMS->>OS: Feign GET /api/orders/{id} (fetch totalPrice)
-    OS-->>PMS: Order (totalPrice)
-    Note over PMS: amount == totalPrice? No → 400 "Amount mismatch"
-    PMS->>OS: Feign PUT /api/orders/{id}/pay
-    OS->>OS: status → PAID
-    OS-->>Kafka: order-events {status: PAID}
-    PMS->>PMS: Save payment record (status: PAID)
-    PMS-->>Kafka: payment-events {status: PAID}
-    PMS-->>U: 201 PaymentResponse
+    OS-->>PMS: Order (totalPrice, status)
+    PMS->>RZP: create order (amount ×100 paise, INR, receipt)
+    RZP-->>PMS: razorpay_order_id
+    PMS->>PMS: Save payment record (status = PENDING)
+    PMS-->>U: {razorpayOrderId, amount, keyId}
+    U->>U: Open Razorpay Checkout modal (key_id + order_id)
+    U->>RZP: Customer pays (test card 4111 1111 1111 1111)
+    RZP-->>U: payment.success → payment_id, signature
+    U->>GW: POST /api/payments/verify {razorpayOrderId, paymentId, signature}
+    GW->>PMS: Forward
+    PMS->>PMS: verifySignature(order_id|payment_id, signature, key_secret)
+    Note over PMS: invalid signature → 400, payment FAILED, order stays UNPAID
+    PMS->>OS: Feign PUT /api/orders/{id}/pay (mark PAID)
+    PMS->>PMS: Save payment record (status = SUCCESS)
+    PMS-->>U: PaymentResponse (SUCCESS)
 ```
 
-- **Amount validation** is done by payment-service — if it doesn't match the order total, an error is returned
-- The order only becomes `PAID` after the payment succeeds
+- **Signature verification is backend-only** using Razorpay `key_secret` — a forged "success" from the client is rejected
+- Keys never go to GitHub: `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` env vars
+- If the user abandons checkout, the order stays `UNPAID` (stock still reserved) and they can retry or cancel
+- Payment statuses: `PENDING` → `SUCCESS` / `FAILED`, and `REFUNDED` on refund
 
 ---
 
 ## 8. Cancel + Refund Flow
 
-Cancellation works for both `UNPAID` and `PAID` orders. If the order is `PAID`, a **refund** happens first.
+Cancellation works for both `UNPAID` and `PAID` orders. If the order is `PAID`, a **real Razorpay refund** happens first.
 
 ```mermaid
 flowchart TD
     A[PUT /api/orders/:id/cancel] --> B{Order status?}
     B -->|UNPAID| C[Restore stock]
     B -->|PAID| D[Call payment-service refund<br/>Feign POST /api/payments/refund]
+    D --> D1[Razorpay Refund API<br/>payment_id ke against]
+    D1 --> D2[payment status → REFUNDED]
     D --> E[Restore stock]
     C --> F[Order status → CANCELLED<br/>+ order-events CANCELLED]
     E --> F
@@ -290,9 +302,10 @@ Status values: `UNPAID` → `PAID` → `CANCELLED`
 ### payment-service (8084)
 | Method | Path | Purpose | Auth |
 |---|---|---|---|
-| POST | `/api/payments` | Process payment (validate + mark PAID) | User |
+| POST | `/api/payments/razorpay/order` | Create Razorpay order (server-side amount, paise) → PENDING | User |
+| POST | `/api/payments/verify` | Verify HMAC signature → mark order PAID, payment SUCCESS | User |
+| POST | `/api/payments/refund` | Real Razorpay refund (cancel flow) | Internal |
 | GET | `/api/payments` | List all payments | Admin |
-| POST | `/api/payments/refund` | Refund (cancel flow) | Internal |
 
 ### notification-service (8085)
 - **No REST endpoints** — it is only a Kafka consumer
@@ -313,7 +326,7 @@ Each service has its **own database** (H2 in dev / MySQL in prod).
 `id` | `userId` | `productId` | `quantity` | `totalPrice` (BigDecimal) | `status` (UNPAID/PAID/CANCELLED) | `createdAt`
 
 ### payments (payment-service)
-`id` | `orderId` | `amount` (BigDecimal) | `status` (PAID/REFUNDED) | `createdAt`
+`id` | `orderId` | `userId` | `razorpayOrderId` | `paymentId` | `signature` | `method` | `amount` (BigDecimal) | `currency` (INR) | `status` (PENDING/SUCCESS/FAILED/REFUNDED) | `createdAt` | `updatedAt`
 
 ### notifications (notification-service)
 `id` | `orderId` | `email` | `message` | `sentAt`
@@ -389,6 +402,13 @@ Root directory = `frontend/`. In `vercel.json`, `/api/*` requests are rewritten 
 | Key | Value |
 |---|---|
 | `ORDER_SERVICE_URL` | `https://<order-service>.onrender.com` |
+| `RAZORPAY_KEY_ID` | Test-mode key from Razorpay Dashboard → Settings → API Keys |
+| `RAZORPAY_KEY_SECRET` | Test-mode secret (never expose to frontend) |
+
+**user-service:**
+| Key | Value |
+|---|---|
+| `JWT_SECRET` | Any 32+ char secret string |
 
 > Spring relaxed binding: the `product-service.url` property is set from the env var `PRODUCT_SERVICE_URL`.
 
@@ -407,8 +427,7 @@ Root directory = `frontend/`. In `vercel.json`, `/api/*` requests are rewritten 
 4. **No tests** — there is no test code in any service
 5. **Distributed transaction gap** — order-service has Feign calls inside `@Transactional`, so if any step fails, there can be a stock/order inconsistency (compensation currently only exists for payment-failure/cancel)
 6. **Dockerfile `EXPOSE 8080`** is hardcoded (actual ports 8081-8085 come from the `PORT` env var)
-7. **Payment is simulated** — there is no real payment gateway (Razorpay/Stripe) — just a record + status update
-8. **No cart** — one order has one product + quantity (no multi-item cart support)
+7. **No cart** — one order has one product + quantity (no multi-item cart support)
 
 ---
 
@@ -426,11 +445,21 @@ curl -X POST http://localhost:8080/api/orders \
   -H "Authorization: Bearer <TOKEN>" \
   -d '{"userId":1,"productId":1,"quantity":2}'
 
-# Pay (with correct amount → PAID)
-curl -X POST http://localhost:8080/api/payments \
+# Pay with Razorpay (Test Mode) → PAID
+# Step 1: create razorpay order (amount is derived server-side)
+curl -X POST http://localhost:8080/api/payments/razorpay/order \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <TOKEN>" \
-  -d '{"orderId":1,"amount":300000.00}'
+  -d '{"orderId":1}'
+#   → { razorpayOrderId: "order_...", amount: 90000.0, keyId: "rzp_test_..." }
+
+# Step 2: in the browser, open Razorpay checkout with that razorpayOrderId + keyId,
+# pay with test card 4111 1111 1111 1111, then verify with the signature:
+curl -X POST http://localhost:8080/api/payments/verify \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <TOKEN>" \
+  -d '{"razorpayOrderId":"order_...","paymentId":"pay_...","signature":"<signature-from-razorpay>"}'
+#   → PaymentResponse (status: SUCCESS), order becomes PAID
 ```
 
 ---

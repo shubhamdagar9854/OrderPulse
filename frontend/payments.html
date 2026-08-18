@@ -25,22 +25,20 @@
 <div class="container">
     <div class="grid-2">
         <div class="card">
-            <h2>Process Payment</h2>
+            <h2>Pay with Razorpay</h2>
+            <p style="color:#666;font-size:0.85rem;margin-bottom:1rem;">Enter an UNPAID order ID. Amount automatically fetch hota hai backend se — checkout Razorpay Test Mode me khulega.</p>
             <form id="paymentForm">
                 <div class="form-group">
                     <label>Order ID</label>
                     <input type="number" id="payOrderId" min="1" required>
                 </div>
-                <div class="form-group">
-                    <label>Amount</label>
-                    <input type="number" id="payAmount" step="0.01" min="0" required>
-                </div>
-                <button type="submit" class="btn btn-success">Pay Now</button>
+                <button type="submit" class="btn btn-success">Pay with Razorpay</button>
             </form>
             <div id="paymentResult" style="margin-top: 1rem;"></div>
         </div>
         <div class="card">
             <h2>Refund Payment</h2>
+            <p style="color:#666;font-size:0.85rem;margin-bottom:1rem;">PAID order cancel hone par refund Razorpay se process hota hai. Ye manual form testing ke liye hai.</p>
             <form id="refundForm">
                 <div class="form-group">
                     <label>Order ID</label>
@@ -53,7 +51,8 @@
     </div>
 </div>
 <script src="js/api.js"></script>
-<script src="js/payments.js "></script>
+<script src="js/razorpay.js"></script>
+<script src="js/payments.js"></script>
 <script>
 function toggleNav() {
     document.querySelector('.nav-links').classList.toggle('open');

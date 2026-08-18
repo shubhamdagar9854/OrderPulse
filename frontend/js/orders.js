@@ -60,7 +60,10 @@ async function loadOrders() {
         };color:${
             o.status === 'CANCELLED' ? '#9b2c2c' : o.status === 'UNPAID' ? '#975a16' : '#276749'
         }">${o.status}</span>
-                    ${(o.status === 'UNPAID' || o.status === 'PAID') ? `<button class="btn btn-sm btn-danger" onclick="cancelOrder(${o.id})" style="margin-left:0.5rem;">Cancel</button>` : ''}
+                </td>
+                <td>
+                    ${o.status === 'UNPAID' ? `<button class="btn btn-sm btn-success" onclick="payOrder(${o.id})">Pay with Razorpay</button>` : ''}
+                    ${(o.status === 'UNPAID' || o.status === 'PAID') ? `<button class="btn btn-sm btn-danger" onclick="cancelOrder(${o.id})" style="margin-left:0.25rem;">Cancel</button>` : ''}
                 </td>
             </tr>
         `).join('');
@@ -77,6 +80,18 @@ async function cancelOrder(id) {
     } catch (err) {
         alert('Error: ' + err.message);
     }
+}
+
+async function payOrder(id) {
+    await openRazorpayCheckout(id, {
+        onSuccess: (verified) => {
+            alert('Payment successful! Order #' + verified.orderId + ' marked PAID (Payment ID: ' + verified.paymentId + ')');
+            loadOrders();
+        },
+        onError: (err) => {
+            alert('Payment failed: ' + err.message);
+        }
+    });
 }
 
 async function loadProductDropdown() {
