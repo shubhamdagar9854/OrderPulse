@@ -6,9 +6,9 @@ import com.shubham.orderservice.dto.OrderRequest;
 import com.shubham.orderservice.dto.OrderResponse;
 import com.shubham.orderservice.entity.Order;
 import com.shubham.orderservice.exception.ResourceNotFoundException;
+import com.shubham.orderservice.exception.ServiceUnavailableException;
 import com.shubham.orderservice.repository.OrderRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
@@ -18,8 +18,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import feign.FeignException;
 
 @Service
 public class OrderService {
@@ -40,10 +44,16 @@ public class OrderService {
     }
 
     @CircuitBreaker(name = "productService", fallbackMethod = "createOrderFallback")
-    @RateLimiter(name = "createOrder", fallbackMethod = "createOrderFallback")
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
-        Map<String, Object> product = productClient.reduceStock(request.getProductId(), Map.of("quantity", request.getQuantity()));
+        Map<String, Object> product;
+        try {
+            product = productClient.reduceStock(request.getProductId(), Map.of("quantity", request.getQuantity()));
+        } catch (FeignException.BadRequest e) {
+            throw new IllegalArgumentException(extractFeignMessage(e, "Invalid product request"));
+        } catch (FeignException.NotFound e) {
+            throw new ResourceNotFoundException("Product not found: " + request.getProductId());
+        }
 
         BigDecimal price = new BigDecimal(product.get("finalPrice").toString());
         BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(request.getQuantity()));
@@ -76,7 +86,7 @@ public class OrderService {
 
     public OrderResponse createOrderFallback(OrderRequest request, Throwable t) {
         log.error("Order creation failed after circuit breaker: {}", t.getMessage());
-        throw new RuntimeException("Service temporarily unavailable. Please try again.");
+        throw unwrapOrGeneric("Service", t);
     }
 
     public List<OrderResponse> findAll() {
@@ -158,7 +168,33 @@ public class OrderService {
 
     public OrderResponse cancelOrderFallback(Long id, Throwable t) {
         log.error("Order cancellation failed after circuit breaker for {}: {}", id, t.getMessage());
-        throw new RuntimeException("Cancellation temporarily unavailable. Please try again.");
+        throw unwrapOrGeneric("Cancellation", t);
+    }
+
+    private RuntimeException unwrapOrGeneric(String context, Throwable t) {
+        if (t instanceof ResourceNotFoundException || t instanceof IllegalArgumentException) {
+            return (RuntimeException) t;
+        }
+        if (t instanceof FeignException feign) {
+            return new ServiceUnavailableException(extractFeignMessage(feign, context + " temporarily unavailable. Please try again."));
+        }
+        return new ServiceUnavailableException(context + " temporarily unavailable. Please try again.");
+    }
+
+    private String extractFeignMessage(FeignException e, String fallback) {
+        try {
+            var body = e.responseBody();
+            if (body.isPresent()) {
+                String json = StandardCharsets.UTF_8.decode(body.get()).toString();
+                Map<String, Object> parsed = new ObjectMapper().readValue(json, Map.class);
+                if (parsed.get("message") != null) {
+                    return parsed.get("message").toString();
+                }
+            }
+        } catch (Exception ignored) {
+            // fall through to fallback message
+        }
+        return fallback;
     }
 
     private OrderResponse toResponse(Order order) {

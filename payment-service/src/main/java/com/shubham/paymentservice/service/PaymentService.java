@@ -140,7 +140,7 @@ public class PaymentService {
     }
 
     public PaymentResponse refund(Long orderId) {
-        Payment payment = paymentRepository.findByOrderIdAndStatus(orderId, "SUCCESS")
+        Payment payment = paymentRepository.findTopByOrderIdAndStatusOrderByUpdatedAtDesc(orderId, "SUCCESS")
                 .orElseThrow(() -> new IllegalArgumentException("No successful payment found for order: " + orderId));
 
         try {
