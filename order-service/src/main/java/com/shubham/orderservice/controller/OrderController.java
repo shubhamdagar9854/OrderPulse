@@ -2,6 +2,7 @@ package com.shubham.orderservice.controller;
 
 import com.shubham.orderservice.dto.OrderRequest;
 import com.shubham.orderservice.dto.OrderResponse;
+import com.shubham.orderservice.dto.OrderStatusRequest;
 import com.shubham.orderservice.service.OrderService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -47,5 +48,10 @@ public class OrderController {
     @PutMapping("/{id}/cancel")
     public ResponseEntity<OrderResponse> cancelOrder(@PathVariable Long id) {
         return ResponseEntity.ok(orderService.cancelOrder(id));
+    }
+
+    @PutMapping("/{id}/status")
+    public ResponseEntity<OrderResponse> updateStatus(@PathVariable Long id, @RequestBody OrderStatusRequest request) {
+        return ResponseEntity.ok(orderService.advanceStatus(id, request));
     }
 }

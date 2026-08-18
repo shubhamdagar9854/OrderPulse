@@ -1,29 +1,31 @@
 package com.shubham.orderservice.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shubham.orderservice.client.PaymentClient;
 import com.shubham.orderservice.client.ProductClient;
 import com.shubham.orderservice.dto.OrderRequest;
 import com.shubham.orderservice.dto.OrderResponse;
+import com.shubham.orderservice.dto.OrderStatusRequest;
 import com.shubham.orderservice.entity.Order;
+import com.shubham.orderservice.enums.OrderStatus;
 import com.shubham.orderservice.exception.ResourceNotFoundException;
 import com.shubham.orderservice.exception.ServiceUnavailableException;
 import com.shubham.orderservice.repository.OrderRepository;
+import feign.FeignException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import feign.FeignException;
 
 @Service
 public class OrderService {
@@ -66,19 +68,7 @@ public class OrderService {
                 .build();
         order = orderRepository.save(order);
 
-        try {
-            kafkaTemplate.send("order-events", Map.of(
-                    "orderId", order.getId(),
-                    "userId", order.getUserId(),
-                    "productId", order.getProductId(),
-                    "quantity", order.getQuantity(),
-                    "totalPrice", order.getTotalPrice(),
-                    "status", order.getStatus(),
-                    "email", "user@example.com"
-            ));
-        } catch (Exception e) {
-            log.warn("Kafka not available, order event skipped: {}", e.getMessage());
-        }
+        publishEvent(order, order.getStatus());
 
         log.info("Order created: {} | status: {}", order.getId(), order.getStatus());
         return toResponse(order);
@@ -111,26 +101,51 @@ public class OrderService {
     public OrderResponse markOrderPaid(Long id) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
-        if ("PAID".equals(order.getStatus())) {
-            return toResponse(order);
-        }
-        if ("CANCELLED".equals(order.getStatus())) {
+        if (order.getStatus() == OrderStatus.CANCELLED) {
             throw new IllegalArgumentException("Cancelled order cannot be paid");
         }
-
-        order.setStatus("PAID");
-        order = orderRepository.save(order);
-
-        try {
-            kafkaTemplate.send("order-events", Map.of(
-                    "orderId", order.getId(),
-                    "status", "PAID"
-            ));
-        } catch (Exception e) {
-            log.warn("Kafka not available, paid event skipped: {}", e.getMessage());
+        if (order.getStatus() == OrderStatus.PAID || order.getStatus().timelinePosition() > OrderStatus.PAID.timelinePosition()) {
+            return toResponse(order);
         }
 
+        order.setStatus(OrderStatus.PAID);
+        order.setPaidAt(LocalDateTime.now());
+        order.touch();
+        order = orderRepository.save(order);
+
+        publishEvent(order, OrderStatus.PAID);
+
         log.info("Order marked PAID: {}", id);
+        return toResponse(order);
+    }
+
+    @Transactional
+    public OrderResponse advanceStatus(Long id, OrderStatusRequest request) {
+        OrderStatus target = parseStatus(request.getStatus());
+
+        if (target == OrderStatus.CANCELLED) {
+            return cancelOrder(id);
+        }
+
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
+
+        if (order.getStatus() == target) {
+            return toResponse(order);
+        }
+        if (!order.getStatus().canTransitionTo(target)) {
+            throw new IllegalArgumentException(
+                    "Cannot change order " + id + " from " + order.getStatus() + " to " + target);
+        }
+
+        order.setStatus(target);
+        applyTimestamp(order, target);
+        order.touch();
+        order = orderRepository.save(order);
+
+        publishEvent(order, target);
+
+        log.info("Order {} moved to {}", id, target);
         return toResponse(order);
     }
 
@@ -139,28 +154,26 @@ public class OrderService {
     public OrderResponse cancelOrder(Long id) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
-        if ("CANCELLED".equals(order.getStatus())) {
+        if (order.getStatus() == OrderStatus.CANCELLED) {
             throw new IllegalArgumentException("Order already cancelled");
         }
+        if (!order.getStatus().isCancellable()) {
+            throw new IllegalArgumentException("Order in " + order.getStatus() + " status cannot be cancelled");
+        }
 
-        if ("PAID".equals(order.getStatus())) {
+        if (order.getStatus() != OrderStatus.UNPAID) {
             paymentClient.refund(Map.of("orderId", order.getId()));
             log.info("Refund processed for order: {}", order.getId());
         }
 
         productClient.restoreStock(order.getProductId(), Map.of("quantity", order.getQuantity()));
 
-        order.setStatus("CANCELLED");
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setCancelledAt(LocalDateTime.now());
+        order.touch();
         order = orderRepository.save(order);
 
-        try {
-            kafkaTemplate.send("order-events", Map.of(
-                    "orderId", order.getId(),
-                    "status", "CANCELLED"
-            ));
-        } catch (Exception e) {
-            log.warn("Kafka not available, cancel event skipped: {}", e.getMessage());
-        }
+        publishEvent(order, OrderStatus.CANCELLED);
 
         log.info("Order cancelled: {}", id);
         return toResponse(order);
@@ -169,6 +182,40 @@ public class OrderService {
     public OrderResponse cancelOrderFallback(Long id, Throwable t) {
         log.error("Order cancellation failed after circuit breaker for {}: {}", id, t.getMessage());
         throw unwrapOrGeneric("Cancellation", t);
+    }
+
+    private OrderStatus parseStatus(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Status is required");
+        }
+        if (!OrderStatus.isValid(value)) {
+            throw new IllegalArgumentException("Invalid status: " + value);
+        }
+        return OrderStatus.valueOf(value.toUpperCase());
+    }
+
+    private void applyTimestamp(Order order, OrderStatus status) {
+        LocalDateTime now = LocalDateTime.now();
+        switch (status) {
+            case PAID -> order.setPaidAt(now);
+            case CONFIRMED -> order.setConfirmedAt(now);
+            case PROCESSING -> order.setProcessedAt(now);
+            case SHIPPED -> order.setShippedAt(now);
+            case DELIVERED -> order.setDeliveredAt(now);
+            default -> { }
+        }
+    }
+
+    private void publishEvent(Order order, OrderStatus status) {
+        try {
+            kafkaTemplate.send("order-events", Map.of(
+                    "orderId", order.getId(),
+                    "userId", order.getUserId(),
+                    "status", status.name()
+            ));
+        } catch (Exception e) {
+            log.warn("Kafka not available, order event skipped: {}", e.getMessage());
+        }
     }
 
     private RuntimeException unwrapOrGeneric(String context, Throwable t) {
@@ -198,14 +245,31 @@ public class OrderService {
     }
 
     private OrderResponse toResponse(Order order) {
+        Map<OrderStatus, LocalDateTime> steps = new LinkedHashMap<>();
+        steps.put(OrderStatus.UNPAID, order.getCreatedAt());
+        if (order.getPaidAt() != null) steps.put(OrderStatus.PAID, order.getPaidAt());
+        if (order.getConfirmedAt() != null) steps.put(OrderStatus.CONFIRMED, order.getConfirmedAt());
+        if (order.getProcessedAt() != null) steps.put(OrderStatus.PROCESSING, order.getProcessedAt());
+        if (order.getShippedAt() != null) steps.put(OrderStatus.SHIPPED, order.getShippedAt());
+        if (order.getDeliveredAt() != null) steps.put(OrderStatus.DELIVERED, order.getDeliveredAt());
+        if (order.getCancelledAt() != null) steps.put(OrderStatus.CANCELLED, order.getCancelledAt());
+
+        List<OrderResponse.TimelineEntry> timeline = new ArrayList<>();
+        for (Map.Entry<OrderStatus, LocalDateTime> entry : steps.entrySet()) {
+            timeline.add(new OrderResponse.TimelineEntry(entry.getKey().name(), entry.getKey().label(), entry.getValue()));
+        }
+
         return OrderResponse.builder()
                 .id(order.getId())
                 .userId(order.getUserId())
                 .productId(order.getProductId())
                 .quantity(order.getQuantity())
                 .totalPrice(order.getTotalPrice())
-                .status(order.getStatus())
+                .status(order.getStatus().name())
+                .statusLabel(order.getStatus().label())
                 .createdAt(order.getCreatedAt())
-                .build();
+                .build()
+                .withTimestamps(order.getPaidAt(), order.getConfirmedAt(), order.getProcessedAt(),
+                        order.getShippedAt(), order.getDeliveredAt(), order.getCancelledAt(), order.getUpdatedAt(), timeline);
     }
 }

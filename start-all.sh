@@ -3,6 +3,22 @@ ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOGS_DIR="$ROOT_DIR/logs"
 mkdir -p "$LOGS_DIR"
 
+# Load environment variables from .env if present (keeps secrets out of git)
+if [ -f "$ROOT_DIR/.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$ROOT_DIR/.env"
+    set +a
+    echo "  Loaded environment from .env"
+fi
+
+if [ -z "$RAZORPAY_KEY_ID" ] || [ -z "$RAZORPAY_KEY_SECRET" ]; then
+    echo ""
+    echo "  ⚠ WARNING: Razorpay keys (RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET) are NOT set."
+    echo "    Payments will FAIL. Add a .env file (see .env.example)."
+    echo ""
+fi
+
 echo ""
 echo " ================================================="
 echo "  Starting OrderPulse - All Services"

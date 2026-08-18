@@ -357,16 +357,21 @@ Each service has its **own database** (H2 in dev / MySQL in prod).
 **Prerequisites:** Java 17, Maven, Docker (for Kafka).
 
 ```bash
-# 1. Start Kafka + Zookeeper (Docker)
+# 1. (Optional) Start Kafka + Zookeeper for notifications
 docker-compose up -d
 
-# 2. Start all services + frontend
+# 2. Set Razorpay TEST keys (required for payments)
+cp .env.example .env      # then fill in RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET
+# .env is git-ignored — never commit real keys.
+
+# 3. Start all services + frontend
 ./start-all.sh          # Linux/macOS
 # or
 start-all.bat           # Windows
 ```
 
-- `start-all.sh` starts eureka → 6 services → frontend (port 5500); all logs go to `logs/`
+- `start-all.sh` sources `.env` if present, then starts 6 services → frontend (port 5500); all logs go to `logs/`
+- If Razorpay keys are missing it prints a warning (payments will fail)
 - Open: `http://localhost:5500`
 - Works even without Kafka (notifications just won't be created)
 - Stop: `./stop-all.sh`

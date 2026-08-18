@@ -81,6 +81,7 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
         if ("POST".equals(method) && path.equals("/api/products")) return true;
         if ("PUT".equals(method) && path.startsWith("/api/products/")) return true;
         if ("GET".equals(method) && path.equals("/api/orders")) return true;
+        if ("PUT".equals(method) && path.matches("/api/orders/\\d+/status")) return true;
         if ("GET".equals(method) && path.equals("/api/payments")) return true;
         return false;
     }

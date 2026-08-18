@@ -51,6 +51,7 @@ const orderAPI = {
     create: (data) => apiRequest('/api/orders', { method: 'POST', body: data }),
     getByUser: (userId) => apiRequest(`/api/orders/user/${userId}`),
     cancel: (id) => apiRequest(`/api/orders/${id}/cancel`, { method: 'PUT' }),
+    updateStatus: (id, status) => apiRequest(`/api/orders/${id}/status`, { method: 'PUT', body: { status } }),
 };
 
 const paymentAPI = {
